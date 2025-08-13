@@ -1,0 +1,555 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="utf-8" />
+	<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+	<title>Quantum Square Quest</title>
+	<style>
+		:root {
+			--bg: #0f172a;
+			--fg: #e2e8f0;
+			--ui-bg: rgba(2, 6, 23, 0.5);
+			--accent: #22d3ee;
+		}
+
+		html, body {
+			height: 100%;
+		}
+
+		body {
+			margin: 0;
+			background: var(--bg);
+			color: var(--fg);
+			font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji";
+			user-select: none;
+			-webkit-user-select: none;
+			touch-action: none;
+			overflow: hidden;
+		}
+
+		#game {
+			display: block;
+			width: 100vw;
+			height: 100vh;
+			background: linear-gradient(180deg, #0b1220 0%, #0f172a 60%, #0b1220 100%);
+		}
+
+		.hud {
+			position: fixed;
+			top: 12px;
+			left: 12px;
+			background: var(--ui-bg);
+			backdrop-filter: blur(6px);
+			-webkit-backdrop-filter: blur(6px);
+			padding: 8px 12px;
+			border-radius: 10px;
+			border: 1px solid rgba(148, 163, 184, 0.15);
+			box-shadow: 0 6px 16px rgba(0,0,0,0.25);
+			font-weight: 600;
+			letter-spacing: 0.3px;
+		}
+
+		.overlay {
+			position: fixed;
+			inset: 0;
+			display: none;
+			align-items: center;
+			justify-content: center;
+			padding: 24px;
+			background: radial-gradient(1200px 600px at 50% 30%, rgba(2,6,23,0.35), rgba(2,6,23,0.75));
+		}
+
+		.overlay.visible { display: flex; }
+
+		.dialog {
+			background: rgba(15, 23, 42, 0.8);
+			backdrop-filter: blur(8px);
+			-webkit-backdrop-filter: blur(8px);
+			border: 1px solid rgba(148, 163, 184, 0.2);
+			padding: 20px 22px;
+			border-radius: 14px;
+			width: min(92vw, 440px);
+			box-shadow: 0 20px 60px rgba(0,0,0,0.45);
+			text-align: center;
+		}
+
+		.title {
+			font-size: 22px;
+			margin: 0 0 8px;
+		}
+
+		.subtitle {
+			font-size: 14px;
+			opacity: 0.8;
+			margin: 0 0 16px;
+		}
+
+		.scoreline {
+			display: flex;
+			align-items: center;
+			justify-content: center;
+			gap: 10px;
+			margin: 10px 0 18px;
+			font-size: 16px;
+		}
+
+		.btn {
+			appearance: none;
+			border: 0;
+			background: linear-gradient(180deg, #22d3ee, #06b6d4);
+			color: #0b1220;
+			font-weight: 800;
+			letter-spacing: 0.3px;
+			padding: 12px 18px;
+			border-radius: 12px;
+			cursor: pointer;
+			box-shadow: 0 8px 20px rgba(34, 211, 238, 0.35), inset 0 1px 0 rgba(255,255,255,0.25);
+		}
+
+		.btn:active { transform: translateY(1px); }
+
+		.btn.secondary {
+			background: linear-gradient(180deg, #64748b, #475569);
+			margin-top: 8px;
+		}
+
+		.difficulty-info {
+			margin: 16px 0;
+			text-align: left;
+		}
+
+		.difficulty-level {
+			display: flex;
+			align-items: center;
+			gap: 8px;
+			margin: 8px 0;
+			font-size: 14px;
+		}
+
+		.color-indicator {
+			width: 16px;
+			height: 16px;
+			border-radius: 4px;
+			border: 2px solid rgba(255,255,255,0.3);
+		}
+
+		.color-indicator.green { background: #10b981; }
+		.color-indicator.orange { background: #f59e0b; }
+		.color-indicator.purple { background: #8b5cf6; }
+		.color-indicator.blue { background: #3b82f6; }
+
+		.kbd {
+			font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+			padding: 2px 6px;
+			border-radius: 6px;
+			background: rgba(148,163,184,0.15);
+			border: 1px solid rgba(148,163,184,0.25);
+			font-size: 12px;
+		}
+	</style>
+</head>
+<body>
+	<canvas id="game" aria-label="Quantum Square Quest game" role="img"></canvas>
+	<div class="hud" aria-live="polite">
+		Score: <span id="score">0</span> | 
+		Speed: <span id="speedLevel">1x</span>
+	</div>
+
+	<!-- Home Screen -->
+	<div id="homeScreen" class="overlay visible" role="dialog" aria-modal="true" aria-labelledby="home-title">
+		<div class="dialog">
+			<h1 id="home-title" class="title">Quantum Square Quest</h1>
+			<p class="subtitle">Navigate through 4 dimensions of increasing challenge</p>
+			<div class="difficulty-info">
+				<div class="difficulty-level">
+					<span class="color-indicator green"></span>
+					<span>Level 1: Green (0-10)</span>
+				</div>
+				<div class="difficulty-level">
+					<span class="color-indicator orange"></span>
+					<span>Level 2: Orange (10-20)</span>
+				</div>
+				<div class="difficulty-level">
+					<span class="color-indicator purple"></span>
+					<span>Level 3: Purple (20-30)</span>
+				</div>
+				<div class="difficulty-level">
+					<span class="color-indicator blue"></span>
+					<span>Level 4: Blue (30-40)</span>
+				</div>
+			</div>
+			<button id="startGameBtn" class="btn" type="button">Start Quest</button>
+		</div>
+	</div>
+
+	<!-- Game Over/Win Screen -->
+	<div id="overlay" class="overlay" role="dialog" aria-modal="true" aria-labelledby="dlg-title">
+		<div class="dialog">
+			<h2 id="dlg-title" class="title">Game Over</h2>
+			<p class="subtitle">The square reached the bottom.</p>
+			<div class="scoreline">Your score: <strong id="finalScore">0</strong></div>
+			<button id="restartBtn" class="btn" type="button">Restart</button>
+			<button id="homeBtn" class="btn secondary" type="button">Home Screen</button>
+			<p class="subtitle" style="margin-top:14px;">
+				Tip: Click or tap the square before it hits the bottom.
+			</p>
+		</div>
+	</div>
+
+	<!-- Win Screen -->
+	<div id="winScreen" class="overlay" role="dialog" aria-modal="true" aria-labelledby="win-title">
+		<div class="dialog">
+			<h2 id="win-title" class="title">🎉 You Won! 🎉</h2>
+			<p class="subtitle">Congratulations! You've completed all 4 dimensions!</p>
+			<div class="scoreline">Final score: <strong id="winScore">40</strong></div>
+			<button id="winRestartBtn" class="btn" type="button">Play Again</button>
+			<button id="winHomeBtn" class="btn secondary" type="button">Home Screen</button>
+		</div>
+	</div>
+
+	<script>
+		(function () {
+			"use strict";
+
+			const canvas = document.getElementById("game");
+			const ctx = canvas.getContext("2d", { alpha: false });
+			const scoreEl = document.getElementById("score");
+			const speedLevelEl = document.getElementById("speedLevel");
+			const homeScreenEl = document.getElementById("homeScreen");
+			const overlayEl = document.getElementById("overlay");
+			const winScreenEl = document.getElementById("winScreen");
+			const finalScoreEl = document.getElementById("finalScore");
+			const winScoreEl = document.getElementById("winScore");
+			const startGameBtn = document.getElementById("startGameBtn");
+			const restartBtn = document.getElementById("restartBtn");
+			const homeBtn = document.getElementById("homeBtn");
+			const winRestartBtn = document.getElementById("winRestartBtn");
+			const winHomeBtn = document.getElementById("winHomeBtn");
+
+			let devicePixelRatioCached = 1;
+			let frameRequestId = 0;
+
+			// Game state
+			const initialSquareSize = 42; // CSS pixels
+			const minSquareSize = 28;
+			let squareSize = initialSquareSize;
+			const initialFallSpeed = 180; // px per second
+			let fallSpeed = initialFallSpeed;
+			
+			// Speed progression system - changes every 10 squares
+			const speedLevels = [1, 1.2, 1.4, 1.5];
+			let currentSpeedLevel = 0;
+			
+			// Color system for each difficulty level
+			const levelColors = {
+				0: '#10b981', // Green (0-10)
+				1: '#f59e0b', // Orange (10-20)
+				2: '#8b5cf6', // Purple (20-30)
+				3: '#3b82f6'  // Blue (30-40)
+			};
+			
+			// Particle system
+			const particles = [];
+			const maxParticles = 50;
+
+			let score = 0;
+			let isGameOver = false;
+			let isGameWon = false;
+			let squareX = 0;
+			let squareY = 0;
+			let squareColor = levelColors[0];
+			let lastTimestampMs = 0;
+
+			// Simple audio (synth) — created on first interaction
+			/** @type {AudioContext | null} */
+			let audioCtx = null;
+
+			// Particle class for click effects
+			class Particle {
+				constructor(x, y, color) {
+					this.x = x;
+					this.y = y;
+					this.vx = (Math.random() - 0.5) * 400; // Faster random velocity X
+					this.vy = (Math.random() - 0.5) * 400; // Faster random velocity Y
+					this.life = 1.0; // Life from 1.0 to 0.0
+					this.decay = 0.04; // Faster decay for more poppy effect
+					this.size = Math.random() * 6 + 3; // Larger particles
+					this.color = color;
+					this.alpha = 1.0;
+					this.gravity = 300; // Add gravity for more realistic movement
+				}
+
+				update(dt) {
+					this.x += this.vx * dt;
+					this.y += this.vy * dt;
+					this.vy += this.gravity * dt; // Apply gravity
+					this.life -= this.decay;
+					this.alpha = this.life;
+					this.size *= 0.95; // Faster shrinking
+				}
+
+				draw(ctx) {
+					if (this.life <= 0) return;
+					
+					ctx.save();
+					ctx.globalAlpha = this.alpha;
+					ctx.fillStyle = this.color;
+					ctx.beginPath();
+					ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+					ctx.fill();
+					
+					// Add glow effect
+					ctx.shadowColor = this.color;
+					ctx.shadowBlur = this.size * 2;
+					ctx.fill();
+					ctx.restore();
+				}
+
+				isDead() {
+					return this.life <= 0;
+				}
+			}
+
+			function createParticles(x, y, color, count = 15) {
+				for (let i = 0; i < count; i++) {
+					if (particles.length < maxParticles) {
+						particles.push(new Particle(x, y, color));
+					}
+				}
+			}
+
+			function updateParticles(dt) {
+				for (let i = particles.length - 1; i >= 0; i--) {
+					particles[i].update(dt);
+					if (particles[i].isDead()) {
+						particles.splice(i, 1);
+					}
+				}
+			}
+
+			function drawParticles(ctx) {
+				particles.forEach(particle => particle.draw(ctx));
+			}
+
+			function ensureAudio() {
+				if (!audioCtx) {
+					try {
+						audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+					} catch (e) {
+						audioCtx = null;
+					}
+				}
+			}
+
+			function playTone(frequency, durationSec, type = "sine", volume = 0.08) {
+				if (!audioCtx) return;
+				const now = audioCtx.currentTime;
+				const osc = audioCtx.createOscillator();
+				const gain = audioCtx.createGain();
+				osc.type = type;
+				osc.frequency.value = frequency;
+				gain.gain.setValueAtTime(volume, now);
+				gain.gain.exponentialRampToValueAtTime(0.0001, now + Math.max(0.05, durationSec));
+				osc.connect(gain).connect(audioCtx.destination);
+				osc.start(now);
+				osc.stop(now + durationSec + 0.02);
+			}
+
+			function playCatchSound() {
+				ensureAudio();
+				playTone(720, 0.06, "triangle", 0.09);
+			}
+
+			function playFailSound() {
+				ensureAudio();
+				playTone(220, 0.18, "sawtooth", 0.06);
+				setTimeout(() => playTone(140, 0.18, "sine", 0.05), 60);
+			}
+
+
+
+			function resizeCanvas() {
+				const dpr = Math.max(1, window.devicePixelRatio || 1);
+				devicePixelRatioCached = dpr;
+				const cssWidth = window.innerWidth;
+				const cssHeight = window.innerHeight;
+				if (canvas.width !== Math.floor(cssWidth * dpr) || canvas.height !== Math.floor(cssHeight * dpr)) {
+					canvas.width = Math.floor(cssWidth * dpr);
+					canvas.height = Math.floor(cssHeight * dpr);
+					ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+				}
+			}
+
+			function resetSquare() {
+				const width = canvas.clientWidth;
+				const height = canvas.clientHeight;
+				squareSize = Math.max(minSquareSize, initialSquareSize - Math.floor(score / 8));
+				squareX = Math.random() * Math.max(1, (width - squareSize));
+				squareY = -squareSize;
+				
+				// Update speed based on score progression
+				const level = Math.floor(score / 10);
+				currentSpeedLevel = Math.min(level, speedLevels.length - 1);
+				fallSpeed = initialFallSpeed * speedLevels[currentSpeedLevel];
+				
+				// Set color based on current level
+				squareColor = levelColors[currentSpeedLevel];
+				
+				// Update speed display
+				speedLevelEl.textContent = speedLevels[currentSpeedLevel].toFixed(1) + 'x';
+			}
+
+		function startGame() {
+			score = 0;
+			fallSpeed = initialFallSpeed;
+			currentSpeedLevel = 0;
+			isGameOver = false;
+			isGameWon = false;
+			particles.length = 0; // Clear all particles
+			scoreEl.textContent = String(score);
+			speedLevelEl.textContent = '1.0x';
+			
+			// Hide all overlays
+			homeScreenEl.classList.remove("visible");
+			overlayEl.classList.remove("visible");
+			winScreenEl.classList.remove("visible");
+			
+			lastTimestampMs = performance.now();
+			resetSquare();
+			cancelAnimationFrame(frameRequestId);
+			frameRequestId = requestAnimationFrame(tick);
+		}
+
+			function endGame() {
+				isGameOver = true;
+				playFailSound();
+				finalScoreEl.textContent = String(score);
+				overlayEl.classList.add("visible");
+			}
+
+			function onPointerDown(ev) {
+				ensureAudio();
+				if (audioCtx && audioCtx.state === "suspended") {
+					audioCtx.resume().catch(() => {});
+				}
+
+				if (isGameOver || isGameWon) return;
+
+				const rect = canvas.getBoundingClientRect();
+				const px = ev.clientX - rect.left;
+				const py = ev.clientY - rect.top;
+
+				const hit = px >= squareX && px <= squareX + squareSize && py >= squareY && py <= squareY + squareSize;
+				if (hit) {
+					score += 1;
+					scoreEl.textContent = String(score);
+					playCatchSound();
+					
+					// Create particle effect at click location
+					createParticles(px, py, squareColor, 15);
+					
+					// Check for win condition
+					if (score >= 40) {
+						isGameWon = true;
+						winScoreEl.textContent = String(score);
+						winScreenEl.classList.add("visible");
+						return;
+					}
+					
+					resetSquare();
+				}
+			}
+
+		function tick(ts) {
+			const width = canvas.clientWidth;
+			const height = canvas.clientHeight;
+			const dt = Math.min(0.05, (ts - lastTimestampMs) / 1000);
+			lastTimestampMs = ts;
+
+			// Update particles
+			updateParticles(dt);
+
+			// Stop game loop if game is won
+			if (isGameWon) {
+				draw();
+				return;
+			}
+
+			squareY += fallSpeed * dt;
+			if (squareY + squareSize >= height) {
+				draw();
+				endGame();
+				return;
+			}
+
+			draw();
+			frameRequestId = requestAnimationFrame(tick);
+		}
+
+		function draw() {
+			const width = canvas.clientWidth;
+			const height = canvas.clientHeight;
+			ctx.clearRect(0, 0, width, height);
+
+			// Draw particles first (behind the square)
+			drawParticles(ctx);
+
+			ctx.fillStyle = "rgba(0,0,0,0.18)";
+			ctx.filter = "blur(4px)";
+			ctx.fillRect(squareX + 2, squareY + 3, squareSize, squareSize);
+			ctx.filter = "none";
+
+			ctx.fillStyle = squareColor;
+			ctx.fillRect(squareX, squareY, squareSize, squareSize);
+
+			ctx.lineWidth = 2;
+			ctx.strokeStyle = "rgba(0,0,0,0.15)";
+			ctx.strokeRect(squareX + 0.5, squareY + 0.5, squareSize - 1, squareSize - 1);
+		}
+
+			window.addEventListener("resize", () => {
+				const prevWidth = canvas.clientWidth;
+				const prevHeight = canvas.clientHeight;
+				resizeCanvas();
+				const width = canvas.clientWidth;
+				const height = canvas.clientHeight;
+				if (squareX + squareSize > width) squareX = Math.max(0, width - squareSize);
+				if (squareY + squareSize > height) squareY = Math.max(-squareSize, height - squareSize);
+				draw();
+			});
+
+			canvas.addEventListener("pointerdown", onPointerDown, { passive: true });
+			
+			// Button event listeners
+			startGameBtn.addEventListener("click", () => {
+				homeScreenEl.classList.remove("visible");
+				startGame();
+			});
+			
+			restartBtn.addEventListener("click", () => {
+				overlayEl.classList.remove("visible");
+				startGame();
+			});
+			
+			homeBtn.addEventListener("click", () => {
+				overlayEl.classList.remove("visible");
+				homeScreenEl.classList.add("visible");
+			});
+			
+			winRestartBtn.addEventListener("click", () => {
+				winScreenEl.classList.remove("visible");
+				startGame();
+			});
+			
+			winHomeBtn.addEventListener("click", () => {
+				winScreenEl.classList.remove("visible");
+				homeScreenEl.classList.add("visible");
+			});
+
+			resizeCanvas();
+			// Don't auto-start game, show home screen instead
+			// startGame();
+		})();
+	</script>
+</body>
+</html>
